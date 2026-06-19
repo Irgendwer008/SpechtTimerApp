@@ -25,14 +25,21 @@ class RaceTimer:
         )
         self.timer_label.pack(pady=20)
 
+        self.diff_label = tk.Label(
+            root,
+            text="00:00.000",
+            font=("Arial", 30),
+        )
+        self.diff_label.pack(pady=20)
+
         info = [
-            "S = Start/Ziel",
+            "S = (Re-)start",
             "1 = Nase",
             "2 = Schikane",
             "3 = Norman-Kurve",
             "4 = Felix-Kurve",
             "5 = Shell-S",
-            "SPACE = Finish Lap",
+            "SPACE = Start/Ziel",
             "X = Export CSV",
         ]
 
@@ -79,6 +86,8 @@ class RaceTimer:
             f"Session started at {datetime.now()}\n\n"
         )
 
+        self.record_event("Start/Ziel")
+
     def elapsed(self):
         if not self.running:
             return 0.0
@@ -89,14 +98,29 @@ class RaceTimer:
             return
 
         t = self.elapsed()
+        time = round(t, 3)
+
+        # Calculate time difference
+        if self.lap_number > 1:
+            curve_index = 0 if checkpoint == "Start/Ziel" else self.checkpoints.index(checkpoint)
+            time_to_curve_current = time - self.events[-(curve_index + 1)]["time"]
+            time_to_curve_lastlap = self.events[-len(self.checkpoints)]["time"] - self.events[-(len(self.checkpoints) + curve_index + 1)]["time"]
+            
+            t_diff = time_to_curve_current - time_to_curve_lastlap
+
+            sign = "" if t_diff > 0 else "-"
+            minutes = int(abs(t_diff) // 60)
+            seconds = abs(t_diff) % 60
+            
+            self.diff_label.config(
+                text=f"{sign}{minutes:02d}:{seconds:06.3f}"
+            )
 
         self.events.append({
             "lap": self.lap_number,
             "checkpoint": checkpoint,
-            "time": round(t, 3)
+            "time": time
         })
-
-        print(self.events)
 
         self.log.insert(
             tk.END,
