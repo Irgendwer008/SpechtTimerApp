@@ -26,9 +26,7 @@ class Session:
         t = time.perf_counter()
 
         if (len(self.laps) == 0) or (self.current_checkpoint + 1 >= len(self.checkpoints)):
-            print(True)
             self.laps.append(Lap(len(self.laps), t, []))
-            print("Test")
         
         current_lap = self.laps[-1]
 
@@ -53,7 +51,6 @@ class Session:
             else:
                 time2 = time1 - self.laps[-2].relative_checkpoint_times[self.current_checkpoint]
         
-        print(len(self.laps), self.current_checkpoint)
         return f"{description}: {format_time(time1)} ({format_time(time2, timediff = True)})"
     
     def redo_checkpoint(self) -> str:
