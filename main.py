@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 
+from datetime import datetime
 import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog, messagebox
 import time
 import csv
-from datetime import datetime
+
+from classes import Session, Lap
+from helper import format_time
 
 class RaceTimer:
     def __init__(self, root):
@@ -13,10 +17,15 @@ class RaceTimer:
 
         self.running = False
         self.start_time = None
-        self.lap_number = 1
-        self.events = []
 
-        self.checkpoints = ["Nase", "Schikane", "Norman-Kurve", "Felix-Kurve", "Shell-S"]
+        self.session = Session(["Start", "Nase", "Schikane", "Norman-Kurve", "Felix-Kurve", "Shell-S"])
+
+        info = [
+            "+ = Next Checkpoint",
+            "- = Retake last Checkpoint",
+            "R = Reset and start new Session"
+            "X = Export CSV",
+        ]
 
         self.timer_label = tk.Label(
             root,
@@ -32,22 +41,27 @@ class RaceTimer:
         )
         self.diff_label.pack(pady=20)
 
-        info = [
-            "S = (Re-)start",
-            "1 = Nase",
-            "2 = Schikane",
-            "3 = Norman-Kurve",
-            "4 = Felix-Kurve",
-            "5 = Shell-S",
-            "SPACE = Start/Ziel",
-            "X = Export CSV",
-        ]
-
         for line in info:
             tk.Label(root, text=line, font=("Arial", 16)).pack()
 
-        self.log = tk.Text(root, height=15, width=80)
-        self.log.pack(pady=20)
+        # Table
+
+        columns = ["Lap"]
+        columns.extend(self.session.checkpoints)
+
+        self.table = ttk.Treeview(
+            root,
+            columns=columns,
+            show="headings",
+            height=20
+        )
+
+        for col in columns:
+            self.table.heading(col, text=col)
+            self.table.column(col, width=160, anchor="center")
+
+        self.table.pack(fill="both", expand=True, padx=20, pady=20)
+
 
         root.bind("<Key>", self.key_pressed)
 
@@ -56,92 +70,76 @@ class RaceTimer:
     def key_pressed(self, event):
         key = event.keysym.lower()
 
-        if key == "s":
+        if key == "r":
             self.start_session()
+            summary = self.session.next_checkpoint()
+            print(summary)
+            self.add_table_entry(summary)
 
-        elif key == "space":
-            self.record_event("Start/Ziel")
-            self.lap_number += 1
+        elif key == "+":
+            summary = self.session.next_checkpoint()
+            print(summary)
+            self.add_table_entry(summary)
+
+        elif key == "-":
+            summary = self.session.redo_checkpoint()
+            self.add_table_entry(summary)
 
         elif key == "x":
             self.export_csv()
 
-        else:
-            try:
-                number = int(key) - 1
-                if number in range(0, len(self.checkpoints)):
-                    self.record_event(self.checkpoints[number])
-            except:
-                pass
-
     def start_session(self):
-        self.running = True
-        self.start_time = time.perf_counter()
-        self.lap_number = 1
-        self.events.clear()
-        self.log.delete("1.0", tk.END)
+        self.session.start()
 
-        self.log.insert(
-            tk.END,
-            f"Session started at {datetime.now()}\n\n"
-        )
-
-        self.record_event("Start/Ziel")
-
-    def elapsed(self):
-        if not self.running:
-            return 0.0
-        return time.perf_counter() - self.start_time
-
-    def record_event(self, checkpoint):
-        if not self.running:
-            return
-
-        t = self.elapsed()
-        time = round(t, 3)
-
-        # Calculate time difference
-        if self.lap_number > 1:
-            curve_index = 0 if checkpoint == "Start/Ziel" else self.checkpoints.index(checkpoint)
-            time_to_curve_current = time - self.events[-(curve_index + 1)]["time"]
-            time_to_curve_lastlap = self.events[-len(self.checkpoints)]["time"] - self.events[-(len(self.checkpoints) + curve_index + 1)]["time"]
-            
-            t_diff = time_to_curve_current - time_to_curve_lastlap
-
-            sign = "" if t_diff > 0 else "-"
-            minutes = int(abs(t_diff) // 60)
-            seconds = abs(t_diff) % 60
-            
-            self.diff_label.config(
-                text=f"{sign}{minutes:02d}:{seconds:06.3f}"
-            )
-
-        self.events.append({
-            "lap": self.lap_number,
-            "checkpoint": checkpoint,
-            "time": time
-        })
-
-        self.log.insert(
-            tk.END,
-            f"Lap {self.lap_number:02d} | "
-            f"{checkpoint:<12} | "
-            f"{t:.3f}s\n"
-        )
-
-        self.log.see(tk.END)
+        for row in self.table.get_children():
+            self.table.delete(row)
 
     def update_timer(self):
-        if self.running:
-            t = self.elapsed()
-            minutes = int(t // 60)
-            seconds = t % 60
+        if self.session.start_time != None:
+            t = self.session.elapsed()
+            self.timer_label.config(text = format_time(t))
+        
+        self.root.after(20, self.update_timer)
 
-            self.timer_label.config(
-                text=f"{minutes:02d}:{seconds:06.3f}"
+    def add_table_entry(self, summary: str):
+        pass
+
+
+
+
+
+
+
+    def update_table(self, lap, checkpoint, lap_time, delta=None):
+
+        if lap not in self.lap_data:
+            self.lap_data[lap] = {}
+
+        if delta is None:
+            text = f"{lap_time:.3f}"
+        else:
+            text = f"{lap_time:.3f} ({delta:+.3f})"
+
+        self.lap_data[lap][checkpoint] = text
+
+        values = [lap]
+
+        for cp in ["Start/Ziel"] + self.checkpoints:
+            values.append(
+                self.lap_data[lap].get(cp, "")
             )
 
-        self.root.after(20, self.update_timer)
+        item_id = f"lap_{lap}"
+
+        if self.table.exists(item_id):
+            self.table.item(item_id, values=values)
+        else:
+            self.table.insert(
+                "",
+                "end",
+                iid=item_id,
+                values=values
+            )
 
     def export_csv(self):
         if not self.events:
