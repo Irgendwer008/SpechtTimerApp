@@ -89,6 +89,12 @@ class RaceTimer:
                     summary, diff_time = self.session.next_checkpoint()
                     self.update_diff_label(diff_time)
                     self.add_table_entry(summary)
+                else:
+                    self.start_session(checkpoints)
+
+                    self.update_timer()
+                    self.running = True
+
 
             case "-":
                 if self.running:
