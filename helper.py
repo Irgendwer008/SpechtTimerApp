@@ -1,4 +1,4 @@
-def format_time(t: float, timediff: bool = False):
+def format_time(t: float, time_diff: bool = False):
     if t is None:
         return "--:--.---"
 
@@ -7,7 +7,7 @@ def format_time(t: float, timediff: bool = False):
     sign = ""
 
     if t >= 0:
-        if timediff:
+        if time_diff:
             sign = "+"
     else:
         sign = "-"

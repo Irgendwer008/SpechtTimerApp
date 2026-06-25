@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from helper import format_time
 import time
@@ -14,47 +14,62 @@ class Session:
         self.date = None
         self.start_time = None
         self.checkpoints = checkpoints
-        self.current_checkpoint = -1
+        self.current_checkpoint = 0
         self.laps = []
 
     def start(self):
         self.start_time = time.perf_counter()
         self.date = datetime.now()
+        self.laps.append(Lap(time.perf_counter()))
 
     def next_checkpoint(self) -> str:
-
+        newlap = False
         t = time.perf_counter()
 
-        if (len(self.laps) == 0) or (self.current_checkpoint + 1 >= len(self.checkpoints)):
-            self.laps.append(Lap(len(self.laps), t, []))
-        
         current_lap = self.laps[-1]
 
-        current_lap.relative_checkpoint_times.append(t - current_lap.start_time)
-        self.current_checkpoint = (self.current_checkpoint + 1) % len(self.checkpoints)
+        # The checkpoint we're recording right now
+        checkpoint_idx = self.current_checkpoint
 
-        description = self.checkpoints[self.current_checkpoint]
-        
         time1 = t - current_lap.start_time
-        # if first lap
+        current_lap.relative_checkpoint_times.append(time1)
+
         if current_lap.number == 0:
             time2 = None
         else:
-            # if start/finish
-            if self.current_checkpoint == 0:
-                time1 = current_lap.start_time - self.laps[-2].start_time
-                if current_lap.number == 1:
-                    time2 = None
-                else:
-                    time2 = time1 - (self.laps[-2].start_time - self.laps[-3].start_time)
+            prev_lap = self.laps[-2]
 
+            if checkpoint_idx < len(prev_lap.relative_checkpoint_times):
+                time2 = (
+                    time1
+                    - prev_lap.relative_checkpoint_times[checkpoint_idx]
+                )
             else:
-                time2 = time1 - self.laps[-2].relative_checkpoint_times[self.current_checkpoint]
+                time2 = None
+
+        summary = f"{format_time(time1)} ({format_time(time2, time_diff = True)})"
+
+        # Advance to the next checkpoint
+        if checkpoint_idx + 1 >= len(self.checkpoints):
+            self.laps.append(Lap(t, number=len(self.laps)))
+            self.current_checkpoint = 0
+        else:
+            self.current_checkpoint = checkpoint_idx + 1
         
-        return f"{description}: {format_time(time1)} ({format_time(time2, timediff = True)})"
+        return summary, time2
     
     def redo_checkpoint(self) -> str:
-        pass
+        if len(self.laps[-1].relative_checkpoint_times) == 0:
+            self.laps.pop()
+
+        self.laps[-1].relative_checkpoint_times.pop()
+
+        if self.current_checkpoint > 0:
+            self.current_checkpoint -= 1
+        else:
+            self.current_checkpoint = len(self.checkpoints) - 1
+
+        return self.next_checkpoint()
 
     def get_lap_count(self) -> int:
         return len(self.laps)
@@ -67,6 +82,6 @@ class Session:
 
 @dataclass
 class Lap:
-    number: int
     start_time: float
-    relative_checkpoint_times: list[int]
+    number: int = 0
+    relative_checkpoint_times: list[int] = field(default_factory=list)
