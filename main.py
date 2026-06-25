@@ -11,7 +11,7 @@ import csv
 from classes import Session, Lap
 from helper import format_time
 
-checkpoints = ["Nase", "Schikane", "Norman-Kurve", "Felix-Kurve", "Shell-S", "Start / Ziel"]
+checkpoints = ["Nase", "Schikane", "Norman-Kurve", "Felix-Kurve", "Shell-S #1", "Shell-S #2", "Start / Ziel"]
 
 class RaceTimer:
     def __init__(self, root):
@@ -111,6 +111,7 @@ class RaceTimer:
             
     def start_session(self, checkpoints: list[str]):
         self.current_table_row_texts = []
+        self.diff_label.config(text="00:00.000")
         
         self.session = Session(checkpoints)
         self.session.start()
@@ -164,7 +165,7 @@ class RaceTimer:
             messagebox.showinfo("Info", "No events recorded.")
             return
 
-        with open(Path.home() / "Downloads" / f"{self.session.date.strftime("%Y-%m-%d %H:%M")} (exported {datetime.now().strftime("%H:%M:%S")}).csv", "w", newline="") as f:
+        with open(Path.home() / "Downloads" / f"{self.session.date.strftime("%Y-%m-%d %H:%M:%S")} (exported {datetime.now().strftime("%H:%M:%S")}).csv", "w", newline="") as f:
             writer = csv.writer(f)
 
             # Header
